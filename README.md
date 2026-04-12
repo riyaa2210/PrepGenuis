@@ -1,6 +1,19 @@
 # 🧠 AI Interview Coach & Recruiter Platform
 
 A production-ready full-stack AI-powered interview platform built with Node.js, React, MongoDB, and Google Gemini.
+## ✨ Key Features
+
+- **RAG-powered questions** — Gemini reads your resume + JD to generate personalized questions
+- **Adaptive difficulty** — Easy → Medium → Hard based on your answers
+- **Real-time speech feedback** — Socket.io streams coaching tips while you speak
+- **AI Scorecard** — Communication, Technical, Confidence, Clarity scores
+- **Filler word detection** — Catches "um", "uh", "like", "you know"
+- **PDF generation** — ATS resume + interview report via Puppeteer
+- **Monaco code editor** — Full coding interview mode with AI evaluation
+- **Recruiter dashboard** — Candidate ranking, filtering, AI summaries
+- **Memory system** — AI remembers your past weak topics
+- **JWT + refresh tokens** — Secure auth with token blacklisting on logout
+
 
 ---
 
@@ -140,15 +153,3 @@ npm run build
 
 ---
 
-## ✨ Key Features
-
-- **RAG-powered questions** — Gemini reads your resume + JD to generate personalized questions
-- **Adaptive difficulty** — Easy → Medium → Hard based on your answers
-- **Real-time speech feedback** — Socket.io streams coaching tips while you speak
-- **AI Scorecard** — Communication, Technical, Confidence, Clarity scores
-- **Filler word detection** — Catches "um", "uh", "like", "you know"
-- **PDF generation** — ATS resume + interview report via Puppeteer
-- **Monaco code editor** — Full coding interview mode with AI evaluation
-- **Recruiter dashboard** — Candidate ranking, filtering, AI summaries
-- **Memory system** — AI remembers your past weak topics
-- **JWT + refresh tokens** — Secure auth with token blacklisting on logout
