@@ -155,13 +155,7 @@ exports.askFollowUp = async ({ interviewId, questionId, followUp, userId }) => {
   const answer = interview.answers.find((a) => a.questionId?.toString() === questionId);
   if (!answer) throw new AppError('Answer not found.', 404);
 
-  const geminiService = require('./gemini.service');
-  const model = geminiService;
-
-  // Use Gemini to answer follow-up
-  const { GoogleGenerativeAI } = require('@google/generative-ai');
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  const { generateWithFallback } = require('../config/gemini');
 
   const prompt = `
 Interview context:
@@ -173,6 +167,6 @@ Follow-up from candidate: "${followUp}"
 
 Respond helpfully as an interview coach. Be specific and constructive.`;
 
-  const result = await geminiModel.generateContent(prompt);
-  return { response: result.response.text() };
+  const response = await generateWithFallback(prompt);
+  return { response };
 };

@@ -4,9 +4,6 @@ const { generateWithFallback } = require('../config/gemini');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Legacy helper kept for any direct model calls
-const getModel = () => genAI.getGenerativeModel({ model: 'gemini-1.5-flash-8b' });
-
 /**
  * Generate personalized interview questions using RAG (resume + JD)
  */
