@@ -110,8 +110,6 @@ export default function RecruiterDashboardPage() {
                     padding: '10px 14px',
                     borderBottom: '1px solid var(--border)',
                     background: selected?.candidate?._id === c._id ? 'var(--accent-dim)' : 'transparent',
-                    border: 'none',
-                    borderBottom: '1px solid var(--border)',
                     cursor: 'pointer',
                     transition: 'background var(--t-fast)',
                     display: 'flex', alignItems: 'center', gap: 10,

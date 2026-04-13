@@ -1,0 +1,17 @@
+const express = require('express');
+const path    = require('path');
+
+const app  = express();
+const PORT = process.env.PORT || 3000;
+
+// Serve Vite build output
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// Catch-all → index.html so React Router works
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
+app.listen(PORT, () => {
+  console.log(`Frontend running on port ${PORT}`);
+});
