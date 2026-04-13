@@ -107,6 +107,16 @@ app.use(errorHandler);
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
+
+// Guard — fail fast if critical env vars are missing
+const REQUIRED_ENV = ['MONGO_URI', 'JWT_SECRET', 'JWT_REFRESH_SECRET', 'GEMINI_API_KEY'];
+const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+if (missing.length > 0) {
+  logger.error(`Missing required environment variables: ${missing.join(', ')}`);
+  logger.error('Set these in Render → Environment before deploying.');
+  process.exit(1);
+}
+
 server.listen(PORT, () => {
   logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
 });
