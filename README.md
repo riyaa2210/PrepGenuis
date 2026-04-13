@@ -1,155 +1,135 @@
-# 🧠 AI Interview Coach & Recruiter Platform
+<h1 align="center">
+  <img src="https://readme-typing-svg.herokuapp.com?size=30&duration=3000&color=00C2FF&center=true&vCenter=true&width=700&lines=PrepGenius;AI+Interview+Preparation+Platform;Crack+Interviews+with+Confidence" />
+</h1>
 
-A production-ready full-stack AI-powered interview platform built with Node.js, React, MongoDB, and Google Gemini.
-## ✨ Key Features
-
-- **RAG-powered questions** — Gemini reads your resume + JD to generate personalized questions
-- **Adaptive difficulty** — Easy → Medium → Hard based on your answers
-- **Real-time speech feedback** — Socket.io streams coaching tips while you speak
-- **AI Scorecard** — Communication, Technical, Confidence, Clarity scores
-- **Filler word detection** — Catches "um", "uh", "like", "you know"
-- **PDF generation** — ATS resume + interview report via Puppeteer
-- **Monaco code editor** — Full coding interview mode with AI evaluation
-- **Recruiter dashboard** — Candidate ranking, filtering, AI summaries
-- **Memory system** — AI remembers your past weak topics
-- **JWT + refresh tokens** — Secure auth with token blacklisting on logout
-
+<p align="center">
+  <b>AI-powered platform for mock interviews, real-time feedback & hiring intelligence</b>
+</p>
 
 ---
 
-## 🏗 Project Structure
+<p align="center">
+  <img src="https://img.shields.io/badge/Frontend-React+Vite-blue?style=for-the-badge&logo=react" />
+  <img src="https://img.shields.io/badge/Backend-Node.js-green?style=for-the-badge&logo=node.js" />
+  <img src="https://img.shields.io/badge/Database-MongoDB-darkgreen?style=for-the-badge&logo=mongodb" />
+  <img src="https://img.shields.io/badge/AI-Google%20Gemini-orange?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Realtime-Socket.io-black?style=for-the-badge&logo=socket.io" />
+</p>
 
-```
-/
-├── backend/          # Node.js + Express API
-│   ├── config/       # DB, logger
-│   ├── controllers/  # Route handlers
-│   ├── middleware/   # Auth, error, upload, rate-limit
-│   ├── models/       # Mongoose schemas
-│   ├── routes/       # Express routers
-│   ├── services/     # Business logic + Gemini AI
-│   ├── sockets/      # Socket.io real-time
-│   └── utils/        # AppError, token utils
-└── frontend/         # React + Vite + Tailwind
-    └── src/
-        ├── components/  # Reusable UI
-        ├── context/     # AuthContext, InterviewContext
-        ├── hooks/       # useVoiceRecorder, useSocket, useTimer
-        ├── pages/       # All page components
-        └── services/    # API service layer
-```
+<p align="center">
+  <img src="https://img.shields.io/github/stars/riyaa2210/prepgenius?style=social" />
+  <img src="https://img.shields.io/github/forks/riyaa2210/prepgenius?style=social" />
+</p>
 
 ---
 
-## ⚙️ Setup
+<p align="center">
+  <a href="#-demo">Demo</a> •
+  <a href="#-features">Features</a> •
+  <a href="#-workflow">Workflow</a> •
+  <a href="#-tech-stack">Tech Stack</a> •
+  <a href="#-setup">Setup</a>
+</p>
 
-### 1. Backend
+---
 
-```bash
+## 🚀 Overview
+
+PrepGenius is an **AI-powered interview preparation platform** that simulates real interview environments and delivers **real-time feedback, performance analytics, and recruiter-level insights**.
+
+💡 Designed to bridge the gap between **practice and actual hiring decisions**.
+
+---
+
+## 🎥 Demo
+
+<p align="center">
+  <img src="./screenshots/demo.gif" width="800"/>
+</p>
+
+---
+
+## ✨ Features
+
+### 🎤 AI Interview Engine
+- Personalized questions (Resume + JD)
+- Adaptive difficulty (Easy → Medium → Hard)
+- Real-time speech coaching using Socket.io
+- Voice + text answer support
+
+### 📊 AI Scorecard
+- Technical score
+- Communication score
+- Confidence & clarity metrics
+- Strengths & Improvements
+- AI-generated summary
+
+### 📄 Resume Intelligence
+- PDF parsing (skills, projects, experience)
+- ATS score (0–100)
+- Optimized resume PDF download
+
+### 📈 Progress Tracking
+- Score trends over time
+- Weak topic detection
+- AI Memory (tracks past mistakes)
+- Learning roadmap generator
+
+### 🤖 AI Coach
+- Real-time feedback tips
+- Multi-round question generator
+- Memory-based interviews (RAG)
+- Personalized learning roadmap
+
+### 🧑‍⚖️ Recruiter Dashboard
+- Candidate analysis (YES / NO / MAYBE)
+- AI-generated hiring summary
+- Candidate ranking system
+
+---
+
+## 🔄 Workflow
+
+### 👤 Candidate Journey
+
+```mermaid
+graph TD
+A[Register] --> B[Upload Resume]
+B --> C[Setup Interview]
+C --> D[AI Generates Questions]
+D --> E[Answer via Voice/Text]
+E --> F[Real-time Feedback]
+F --> G[AI Evaluation]
+G --> H[Scorecard Generated]
+H --> I[Track Progress]
+```
+---
+### 🏗️ Tech Stack
+Layer	Technology
+Frontend	React, Vite, Chart.js
+Backend	Node.js, Express
+Database	MongoDB
+AI	Google Gemini
+Realtime	Socket.io
+Editor	Monaco Editor
+---
+### ⚙️ Setup
+1️⃣ Clone the repo
+git clone https://github.com/your-username/prepgenius.git
+cd prepgenius
+2️⃣ Backend Setup
 cd backend
 cp .env.example .env
-# Fill in your values in .env
 npm install
-npm run dev
-```
-
-### 2. Frontend
-
-```bash
+npm start
+3️⃣ Frontend Setup
 cd frontend
 npm install
 npm run dev
-```
-
 ---
-
-## 🔑 Environment Variables (backend/.env)
-
-| Variable | Description |
-|---|---|
-| `MONGO_URI` | MongoDB Atlas connection string |
-| `JWT_SECRET` | Secret for access tokens |
-| `JWT_REFRESH_SECRET` | Secret for refresh tokens |
-| `GEMINI_API_KEY` | Google Gemini API key |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
-| `CLIENT_URL` | Frontend URL (for CORS) |
-
----
-
-## 🚀 API Reference
-
-### Auth
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/auth/register` | Register new user |
-| POST | `/api/auth/login` | Login |
-| POST | `/api/auth/google` | Google OAuth login |
-| POST | `/api/auth/refresh` | Refresh access token |
-| POST | `/api/auth/logout` | Logout + blacklist token |
-| GET | `/api/auth/me` | Get current user |
-
-### Interviews
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/interviews` | Create interview (AI generates questions) |
-| GET | `/api/interviews` | List user's interviews |
-| GET | `/api/interviews/:id` | Get interview detail |
-| POST | `/api/interviews/:id/answer` | Submit answer (AI evaluates) |
-| POST | `/api/interviews/:id/complete` | Complete + generate scorecard |
-| POST | `/api/interviews/:id/followup` | Ask AI follow-up question |
-| POST | `/api/interviews/:id/coding` | Submit coding solution |
-| POST | `/api/interviews/feedback/realtime` | Real-time speech feedback |
-| GET | `/api/interviews/roadmap` | AI learning roadmap |
-
-### Resume
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/resume/upload` | Upload + AI parse PDF resume |
-| GET | `/api/resume` | Get parsed resume |
-| DELETE | `/api/resume` | Delete resume |
-
-### PDF
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/pdf/resume` | Download ATS-optimized resume PDF |
-| GET | `/api/pdf/report/:id` | Download interview report PDF |
-
-### Recruiter (role: recruiter/admin)
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/recruiter/candidates` | List all candidates |
-| GET | `/api/recruiter/candidates/:id` | Candidate detail + AI summary |
-| GET | `/api/recruiter/candidates/:id/interviews` | Candidate's interviews |
-| GET | `/api/recruiter/analytics` | Platform analytics |
-
-### Progress
-| Method | Endpoint | Description |
-|---|---|---|
-| GET | `/api/progress` | Progress data + graph + memory |
-
----
-
-## 🌐 Deployment
-
-### Frontend → Vercel
-```bash
-cd frontend
-npm run build
-# Deploy dist/ to Vercel or run: vercel --prod
-```
-
-### Backend → Render / Railway
-1. Push to GitHub
-2. Connect repo to Render
-3. Set environment variables
-4. Build command: `npm install`
-5. Start command: `node server.js`
-
-### Database → MongoDB Atlas
-1. Create free cluster at mongodb.com/atlas
-2. Whitelist `0.0.0.0/0` for production
-3. Copy connection string to `MONGO_URI`
-
----
-
+### 🌟 Why This Project Stands Out
+🧠 Combines GenAI + Speech + Behavioral Analysis
+🎯 Adaptive interview difficulty system
+⚡ Real-time coaching using WebSockets
+📊 Recruiter-level candidate ranking
+🔁 AI Memory (tracks improvement over time)
