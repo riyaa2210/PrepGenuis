@@ -103,7 +103,7 @@ F --> G[AI Evaluation]
 G --> H[Scorecard Generated]
 H --> I[Track Progress]
 ```
-## 🏗️ Tech Stack
+## 🏗️ tech-stack
 
 | Layer      | Technology                  |
 |-----------|----------------------------|
@@ -116,7 +116,7 @@ H --> I[Track Progress]
 
 ---
 
-## ⚙️ Setup
+## ⚙️ setup
 
 ### 1️⃣ Clone the Repository
 ```bash
