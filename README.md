@@ -103,18 +103,23 @@ F --> G[AI Evaluation]
 G --> H[Scorecard Generated]
 H --> I[Track Progress]
 ```
+## 🏗️ Tech Stack
+
+| Layer      | Technology                  |
+|-----------|----------------------------|
+| Frontend  | React, Vite, Chart.js      |
+| Backend   | Node.js, Express           |
+| Database  | MongoDB                    |
+| AI        | Google Gemini              |
+| Realtime  | Socket.io                  |
+| Editor    | Monaco Editor              |
+
 ---
-### 🏗️ Tech Stack
-Layer	Technology
-Frontend	React, Vite, Chart.js
-Backend	Node.js, Express
-Database	MongoDB
-AI	Google Gemini
-Realtime	Socket.io
-Editor	Monaco Editor
----
-### ⚙️ Setup
-1️⃣ Clone the repo
+
+## ⚙️ Setup
+
+### 1️⃣ Clone the Repository
+```bash
 git clone https://github.com/your-username/prepgenius.git
 cd prepgenius
 2️⃣ Backend Setup
@@ -126,8 +131,7 @@ npm start
 cd frontend
 npm install
 npm run dev
----
-### 🌟 Why This Project Stands Out
+🌟 Why This Project Stands Out
 🧠 Combines GenAI + Speech + Behavioral Analysis
 🎯 Adaptive interview difficulty system
 ⚡ Real-time coaching using WebSockets
