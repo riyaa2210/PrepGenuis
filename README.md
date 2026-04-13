@@ -16,11 +16,6 @@
   <img src="https://img.shields.io/badge/Realtime-Socket.io-black?style=for-the-badge&logo=socket.io" />
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/github/stars/riyaa2210/prepgenius?style=social" />
-  <img src="https://img.shields.io/github/forks/riyaa2210/prepgenius?style=social" />
-</p>
-
 ---
 
 <p align="center">
