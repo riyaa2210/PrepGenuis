@@ -4,8 +4,8 @@
   "description": "AI Interview Coach & Recruiter Platform - Backend",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node --dns-result-order=ipv4first server.js",
+    "dev": "nodemon --dns-result-order=ipv4first server.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

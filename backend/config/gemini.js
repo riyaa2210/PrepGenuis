@@ -3,121 +3,182 @@ const logger = require('./logger');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-/**
- * Free-tier models confirmed working on v1beta as of April 2026.
- * Order = preference. Falls through on 429 quota errors.
- *
- * gemini-flash-latest  â€” 1500 req/day, fastest, cheapest
- * gemini-flash-lite-latest     â€” 1500 req/day, better quality
- * gemini-2.5-flash-lite â€” free tier alternative
- */
+// ─── Verified free-tier models (April 2026) ───────────────────────────────────
 const MODEL_FALLBACKS = [
   'gemini-flash-latest',
   'gemini-flash-lite-latest',
   'gemini-2.5-flash-lite',
 ];
 
+// ─── Low-temperature config for deterministic, accurate outputs ───────────────
+const GENERATION_CONFIG = {
+  temperature:     0.2,   // low = consistent, less hallucination
+  topP:            0.8,
+  topK:            20,
+  maxOutputTokens: 4096,
+};
+
+// ─── Error classifiers ────────────────────────────────────────────────────────
 const isQuotaError = (err) => {
-  const msg = err?.message || '';
-  return (
-    msg.includes('429') ||
-    msg.includes('quota') ||
-    msg.includes('RESOURCE_EXHAUSTED') ||
-    msg.includes('Too Many Requests')
-  );
+  const m = err?.message || '';
+  return m.includes('429') || m.includes('quota') ||
+         m.includes('RESOURCE_EXHAUSTED') || m.includes('Too Many Requests');
 };
 
 const isNotFoundError = (err) => {
-  const msg = err?.message || '';
-  return msg.includes('404') || msg.includes('not found') || msg.includes('not supported');
+  const m = err?.message || '';
+  return m.includes('404') || m.includes('not found') || m.includes('not supported');
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/**
- * Generate content with automatic model fallback + exponential backoff.
- * All services must use this instead of calling model().generateContent() directly.
- *
- * @param {string} prompt
- * @param {number} retryDelay  base delay ms between retries on same model
- * @returns {string} raw text response
- */
-const generateWithFallback = async (prompt, retryDelay = 1000) => {
+// ─── Core generator with model fallback + backoff ─────────────────────────────
+const generateWithFallback = async (prompt) => {
   const errors = [];
 
   for (const modelName of MODEL_FALLBACKS) {
-    // Try each model up to 2 times on quota errors
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const model = genAI.getGenerativeModel({ model: modelName });
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: GENERATION_CONFIG,
+        });
         const result = await model.generateContent(prompt);
         if (attempt > 0 || errors.length > 0) {
-          logger.info(`Gemini succeeded with model: ${modelName}`);
+          logger.info(`Gemini OK: ${modelName} (attempt ${attempt + 1})`);
         }
         return result.response.text();
       } catch (err) {
         if (isNotFoundError(err)) {
-          // Model doesn't exist â€” skip immediately, no retry
           logger.warn(`Gemini model ${modelName} not found, skipping`);
           errors.push(`${modelName}: not found`);
           break;
         } else if (isQuotaError(err)) {
           if (attempt === 0) {
-            // First attempt failed on quota â€” wait and retry once
-            const delay = retryDelay * (errors.length + 1);
-            logger.warn(`Gemini quota hit on ${modelName}, retrying in ${delay}ms`);
+            const delay = 1500 * (errors.length + 1);
+            logger.warn(`Gemini quota on ${modelName}, retry in ${delay}ms`);
             await sleep(delay);
           } else {
-            // Second attempt also failed â€” move to next model
-            logger.warn(`Gemini quota exhausted on ${modelName}, trying next model`);
+            logger.warn(`Gemini quota exhausted on ${modelName}`);
             errors.push(`${modelName}: quota exhausted`);
             break;
           }
         } else {
-          // Unknown error â€” propagate immediately (don't retry)
           throw err;
         }
       }
     }
   }
 
-  // All models failed
   const summary = errors.join(' | ');
   logger.error(`All Gemini models failed: ${summary}`);
-  throw new Error(
-    `AI service temporarily unavailable. All models exhausted quota. ` +
-    `Please wait a few minutes and try again. (${summary})`
-  );
+  throw new Error(`AI service unavailable. ${summary}`);
 };
 
-/**
- * Parse JSON from Gemini response â€” strips markdown fences if present.
- */
-const parseJSON = (raw, label) => {
-  // Try object first, then array
-  const objMatch = raw.match(/\{[\s\S]*\}/);
-  const arrMatch = raw.match(/\[[\s\S]*\]/);
-  const match = objMatch || arrMatch;
-  if (!match) throw new Error(`AI returned invalid JSON for ${label}`);
+// ─── Strict JSON parser ───────────────────────────────────────────────────────
+// Strips markdown fences, extracts first valid JSON object or array
+const parseJSON = (raw, label, type = 'object') => {
+  const cleaned = raw
+    .replace(/^```json\s*/im, '')
+    .replace(/^```\s*/im, '')
+    .replace(/```\s*$/im, '')
+    .trim();
+
+  const pattern = type === 'array' ? /\[[\s\S]*\]/ : /\{[\s\S]*\}/;
+  const match = cleaned.match(pattern);
+
+  if (!match) {
+    throw new Error(`No valid JSON ${type} for "${label}". Got: ${raw.slice(0, 120)}`);
+  }
   try {
     return JSON.parse(match[0]);
-  } catch {
-    throw new Error(`Failed to parse ${label} JSON response`);
+  } catch (e) {
+    throw new Error(`JSON.parse failed for "${label}": ${e.message}`);
   }
 };
 
-/**
- * Parse JSON array specifically.
- */
-const parseJSONArray = (raw, label) => {
-  const match = raw.match(/\[[\s\S]*\]/);
-  if (!match) throw new Error(`AI returned invalid JSON array for ${label}`);
-  try {
-    return JSON.parse(match[0]);
-  } catch {
-    throw new Error(`Failed to parse ${label} JSON array`);
-  }
+const parseJSONArray = (raw, label) => parseJSON(raw, label, 'array');
+
+// ─── Input sanitiser ─────────────────────────────────────────────────────────
+// Cleans text before sending to AI — removes junk, caps length
+const sanitise = (text, maxChars = 6000) => {
+  if (!text) return '';
+  return text
+    .replace(/\0/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, maxChars);
 };
 
-module.exports = { generateWithFallback, parseJSON, parseJSONArray };
+// ─── Retry wrapper ────────────────────────────────────────────────────────────
+// Retries up to maxRetries if JSON parsing or schema validation fails
+const generateWithRetry = async (prompt, validator, maxRetries = 3) => {
+  let lastError;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const raw    = await generateWithFallback(prompt);
+      const parsed = parseJSON(raw, 'response');
+      if (validator) validator(parsed);
+      return { raw, parsed };
+    } catch (err) {
+      lastError = err;
+      logger.warn(`Gemini retry ${i + 1}/${maxRetries}: ${err.message}`);
+      if (i < maxRetries - 1) await sleep(800 * (i + 1));
+    }
+  }
+  throw new Error(`AI failed after ${maxRetries} retries: ${lastError?.message}`);
+};
 
+// ─── Schema validators ────────────────────────────────────────────────────────
+const validators = {
+  questions: (data, expectedCount) => {
+    if (!Array.isArray(data.questions)) throw new Error('questions must be array');
+    if (data.questions.length < 1)     throw new Error('questions array empty');
+    if (expectedCount && data.questions.length < expectedCount - 2) {
+      throw new Error(`Expected ~${expectedCount} questions, got ${data.questions.length}`);
+    }
+    data.questions.forEach((q, i) => {
+      if (!q.text) throw new Error(`Question ${i + 1} missing text`);
+      if (!Array.isArray(q.expectedKeywords)) q.expectedKeywords = [];
+    });
+  },
+
+  evaluation: (data) => {
+    const score = Number(data.score);
+    if (isNaN(score) || score < 0 || score > 10) throw new Error(`Invalid score: ${data.score}`);
+    if (!data.feedback) throw new Error('Missing feedback');
+    data.score = Math.round(score * 10) / 10;
+    if (!Array.isArray(data.fillerWords)) data.fillerWords = [];
+    if (typeof data.fillerWordCount !== 'number') data.fillerWordCount = data.fillerWords.length;
+  },
+
+  scorecard: (data) => {
+    const fields = ['communicationScore', 'technicalScore', 'confidenceScore', 'clarityScore', 'overallScore'];
+    fields.forEach((f) => {
+      const v = Number(data[f]);
+      if (isNaN(v) || v < 0 || v > 10) throw new Error(`Invalid ${f}: ${data[f]}`);
+      data[f] = Math.round(v * 10) / 10;
+    });
+    if (!Array.isArray(data.strengths))    data.strengths    = [];
+    if (!Array.isArray(data.improvements)) data.improvements = [];
+    if (!data.aiSummary) data.aiSummary = '';
+  },
+
+  resume: (data) => {
+    if (!Array.isArray(data.skills))     data.skills     = [];
+    if (!Array.isArray(data.experience)) data.experience = [];
+    if (!Array.isArray(data.education))  data.education  = [];
+    if (!Array.isArray(data.projects))   data.projects   = [];
+  },
+};
+
+module.exports = {
+  generateWithFallback,
+  generateWithRetry,
+  parseJSON,
+  parseJSONArray,
+  sanitise,
+  validators,
+  GENERATION_CONFIG,
+};

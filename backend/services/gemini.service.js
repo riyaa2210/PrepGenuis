@@ -1,276 +1,462 @@
-﻿const { GoogleGenerativeAI } = require('@google/generative-ai');
-const logger = require('../config/logger');
-const { generateWithFallback } = require('../config/gemini');
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-/**
- * Generate personalized interview questions using RAG (resume + JD)
+﻿/**
+ * gemini.service.js
+ *
+ * All AI calls go through generateWithRetry (retry + validation).
+ * Every prompt uses:
+ *   - Explicit role assignment
+ *   - Strict JSON-only output instruction
+ *   - Few-shot examples where relevant
+ *   - "Do not assume missing data" anti-hallucination guard
+ *   - Input sanitisation before sending
  */
-exports.generateInterviewQuestions = async ({ resume, jobDescription, round, difficulty, count = 8 }) => {
-  const prompt = `
-You are an expert technical interviewer. Generate ${count} interview questions for a ${round} round interview.
 
-CANDIDATE RESUME SUMMARY:
-${resume}
+const { generateWithRetry, sanitise, validators } = require('../config/gemini');
+
+// ─── Shared system preamble ───────────────────────────────────────────────────
+const JSON_ONLY = `CRITICAL RULES:
+- Return ONLY a valid JSON object. No markdown, no prose, no code fences.
+- Do NOT assume or invent data that is not explicitly provided.
+- If a field has no data, use null or an empty array — never fabricate.`;
+
+// ─── 1. Generate interview questions ─────────────────────────────────────────
+exports.generateInterviewQuestions = async ({
+  resume,
+  jobDescription,
+  round,
+  difficulty,
+  count = 8,
+}) => {
+  const cleanResume = sanitise(resume, 3000);
+  const cleanJD     = sanitise(jobDescription, 2000);
+
+  const roundGuide = {
+    hr:         'Behavioral questions using STAR method (Situation, Task, Action, Result). Focus on teamwork, conflict, motivation.',
+    technical:  'DSA, system design, coding concepts, time/space complexity. At least 1 system design question.',
+    managerial: 'Leadership, decision-making under pressure, stakeholder management, conflict resolution.',
+    coding:     'Algorithmic problems with clear constraints. Include expected input/output.',
+    mock:       'Mix of behavioral and technical questions appropriate for the role.',
+  };
+
+  const difficultyGuide = {
+    easy:   'Foundational concepts, definitions, simple scenarios.',
+    medium: 'Applied knowledge, trade-offs, moderate complexity.',
+    hard:   'Deep expertise, edge cases, architectural decisions.',
+  };
+
+  const prompt = `You are a senior technical interviewer at a top-tier tech company.
+
+TASK: Generate exactly ${count} interview questions for a ${round.toUpperCase()} round.
+
+ROUND FOCUS: ${roundGuide[round] || roundGuide.mock}
+DIFFICULTY: ${difficulty} — ${difficultyGuide[difficulty] || difficultyGuide.medium}
+
+CANDIDATE RESUME:
+${cleanResume || 'Not provided'}
 
 JOB DESCRIPTION:
-${jobDescription}
+${cleanJD || 'General software engineering role'}
 
-DIFFICULTY LEVEL: ${difficulty}
-ROUND TYPE: ${round}
+REQUIREMENTS:
+- Personalize questions to the candidate's actual skills and experience listed above
+- Do NOT repeat question types — vary between conceptual, scenario, problem-solving
+- Each question must have 3–5 expected keywords the answer should contain
+- Assign a category (e.g. "System Design", "Behavioral", "DSA", "Leadership")
 
-Instructions:
-- Questions must be personalized based on the candidate's resume and the job description
-- For technical round: focus on skills mentioned in resume and JD
-- For HR round: focus on behavioral and situational questions
-- For managerial round: focus on leadership, conflict resolution, and strategy
-- Vary question types: conceptual, scenario-based, problem-solving
-- Each question should have a category and expected keywords
+FEW-SHOT EXAMPLE (technical, medium):
+{
+  "text": "You have a distributed cache that occasionally returns stale data. How would you design a cache invalidation strategy?",
+  "category": "System Design",
+  "difficulty": "medium",
+  "expectedKeywords": ["TTL", "event-driven", "write-through", "consistency", "invalidation"]
+}
 
-Respond ONLY with valid JSON in this exact format:
+${JSON_ONLY}
+
+Return this exact structure:
 {
   "questions": [
     {
-      "text": "question text here",
-      "category": "category name",
+      "text": "<full question>",
+      "category": "<category>",
       "difficulty": "${difficulty}",
-      "expectedKeywords": ["keyword1", "keyword2", "keyword3"]
+      "expectedKeywords": ["<kw1>", "<kw2>", "<kw3>"]
     }
   ]
 }`;
 
-  const text = await generateWithFallback(prompt);
-  
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Failed to parse AI response for questions');
-  return JSON.parse(jsonMatch[0]);
+  const { parsed } = await generateWithRetry(
+    prompt,
+    (data) => validators.questions(data, count),
+    3
+  );
+
+  return parsed;
 };
 
-/**
- * Evaluate a single answer and return AI feedback
- */
+// ─── 2. Evaluate a single answer ─────────────────────────────────────────────
 exports.evaluateAnswer = async ({ question, answer, expectedKeywords, round }) => {
-  const prompt = `
-You are an expert interviewer evaluating a candidate's answer.
+  const cleanAnswer = sanitise(answer, 2000);
+
+  // Rubric-based scoring breakdown
+  const rubric = `SCORING RUBRIC (each dimension 0–10, final score = weighted average):
+- Technical Accuracy (40%): Is the answer factually correct? Does it use right terminology?
+- Depth & Completeness (30%): Does it cover edge cases, trade-offs, or nuances?
+- Clarity & Structure (20%): Is it well-organized and easy to follow?
+- Use of Examples (10%): Does it include concrete examples or analogies?`;
+
+  const fillerList = 'um, uh, like, you know, basically, literally, actually, right, so, kind of, sort of, I mean, well, okay, yeah, just, honestly, obviously';
+
+  const prompt = `You are an expert ${round} interviewer evaluating a candidate's answer.
 
 QUESTION: ${question}
-CANDIDATE'S ANSWER: ${answer}
-EXPECTED KEYWORDS: ${expectedKeywords?.join(', ') || 'N/A'}
-ROUND: ${round}
+EXPECTED KEYWORDS: ${expectedKeywords?.join(', ') || 'none specified'}
+ROUND TYPE: ${round}
 
-Evaluate the answer on:
-1. Relevance and accuracy
-2. Depth of knowledge
-3. Communication clarity
-4. Use of expected keywords
+CANDIDATE'S ANSWER:
+"${cleanAnswer || '(no answer provided)'}"
 
-Also detect filler words (um, uh, like, you know, basically, literally, actually, right, so).
+${rubric}
 
-Respond ONLY with valid JSON:
+FILLER WORDS TO DETECT: ${fillerList}
+
+INSTRUCTIONS:
+- Score strictly based on the rubric above
+- If the answer is empty or off-topic, score must be 0–2
+- feedback must reference specific parts of the answer — no generic statements
+- betterAnswer must be a model answer a senior engineer would give
+- Do NOT assume the candidate knows things not shown in their answer
+
+FEW-SHOT EXAMPLE OUTPUT:
 {
-  "score": <number 0-10>,
-  "feedback": "<specific feedback on what was good and what was missing>",
-  "betterAnswer": "<a model answer for this question>",
-  "fillerWords": ["list", "of", "filler", "words", "found"],
-  "fillerWordCount": <number>
+  "score": 6.5,
+  "rubricBreakdown": { "technicalAccuracy": 7, "depthCompleteness": 6, "clarityStructure": 7, "useOfExamples": 5 },
+  "feedback": "Good explanation of LRU eviction but missed discussing cache stampede and TTL strategies.",
+  "betterAnswer": "An LRU cache evicts the least recently used item. For distributed systems, you'd also handle cache stampede using mutex locks or probabilistic early expiration...",
+  "fillerWords": ["basically", "like"],
+  "fillerWordCount": 2
+}
+
+${JSON_ONLY}
+
+Return:
+{
+  "score": <number 0–10, one decimal>,
+  "rubricBreakdown": {
+    "technicalAccuracy": <0–10>,
+    "depthCompleteness": <0–10>,
+    "clarityStructure": <0–10>,
+    "useOfExamples": <0–10>
+  },
+  "feedback": "<specific, evidence-based feedback referencing the answer>",
+  "betterAnswer": "<model answer a senior engineer would give>",
+  "fillerWords": ["<detected filler words only>"],
+  "fillerWordCount": <integer>
 }`;
 
-  const text = await generateWithFallback(prompt);
-  
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Failed to parse AI evaluation');
-  return JSON.parse(jsonMatch[0]);
+  const { parsed } = await generateWithRetry(
+    prompt,
+    validators.evaluation,
+    3
+  );
+
+  return parsed;
 };
 
-/**
- * Generate full scorecard after interview completion
- */
+// ─── 3. Generate full scorecard ───────────────────────────────────────────────
 exports.generateScorecard = async ({ answers, round, jobDescription }) => {
+  const cleanJD = sanitise(jobDescription, 1000);
+
   const answersText = answers
-    .map((a, i) => `Q${i + 1}: ${a.question}\nA: ${a.answer}\nScore: ${a.aiEvaluation?.score || 0}/10`)
+    .map((a, i) =>
+      `Q${i + 1}: ${a.question}\n` +
+      `Answer: ${sanitise(a.answer, 400) || '(no answer)'}\n` +
+      `Score: ${a.aiEvaluation?.score ?? 'N/A'}/10`
+    )
     .join('\n\n');
 
-  const prompt = `
-You are an expert interview coach. Analyze the complete interview performance.
+  const prompt = `You are a senior interview coach generating a post-interview performance report.
 
-ROUND: ${round}
-JOB DESCRIPTION: ${jobDescription || 'Not provided'}
+ROUND: ${round.toUpperCase()}
+JOB DESCRIPTION: ${cleanJD || 'Not provided'}
 
-INTERVIEW Q&A:
+INTERVIEW TRANSCRIPT:
 ${answersText}
 
-Generate a comprehensive scorecard. Respond ONLY with valid JSON:
+SCORING DIMENSIONS:
+- technicalScore: Accuracy and depth of technical answers
+- communicationScore: Clarity, structure, and articulation across all answers
+- confidenceScore: Assertiveness, directness, absence of excessive hedging
+- clarityScore: Logical flow, conciseness, absence of filler words
+- overallScore: Holistic weighted average (technical 40%, communication 25%, confidence 20%, clarity 15%)
+
+INSTRUCTIONS:
+- Base every score on the actual transcript above — do NOT invent performance
+- strengths: 2–4 specific observations backed by evidence from the transcript
+- improvements: 2–4 specific, actionable suggestions
+- aiSummary: 2–3 sentences a hiring manager would read in a debrief
+
+${JSON_ONLY}
+
+Return:
 {
-  "communicationScore": <0-10>,
-  "technicalScore": <0-10>,
-  "confidenceScore": <0-10>,
-  "clarityScore": <0-10>,
-  "overallScore": <0-10>,
-  "fillerWordsDetected": ["list of all filler words used"],
-  "strengths": ["strength 1", "strength 2", "strength 3"],
-  "improvements": ["improvement 1", "improvement 2", "improvement 3"],
-  "aiSummary": "<2-3 sentence professional summary of the candidate's performance>"
+  "technicalScore": <0–10>,
+  "communicationScore": <0–10>,
+  "confidenceScore": <0–10>,
+  "clarityScore": <0–10>,
+  "overallScore": <0–10>,
+  "fillerWordsDetected": ["<word>"],
+  "strengths": ["<specific strength with evidence>"],
+  "improvements": ["<specific, actionable improvement>"],
+  "aiSummary": "<2–3 sentence hiring manager summary>"
 }`;
 
-  const text = await generateWithFallback(prompt);
-  
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Failed to parse scorecard');
-  return JSON.parse(jsonMatch[0]);
+  const { parsed } = await generateWithRetry(
+    prompt,
+    validators.scorecard,
+    3
+  );
+
+  return parsed;
 };
 
-/**
- * Parse resume text and extract structured data
- */
+// ─── 4. Parse resume ──────────────────────────────────────────────────────────
 exports.parseResume = async (rawText) => {
-  const prompt = `
-You are an expert resume parser. Extract structured information from this resume text.
+  const cleanText = sanitise(rawText, 5000);
+
+  const prompt = `You are a professional resume parser.
+
+TASK: Extract structured data from the resume text below.
 
 RESUME TEXT:
-${rawText}
+${cleanText}
 
-Respond ONLY with valid JSON:
+INSTRUCTIONS:
+- Extract only information explicitly present in the text
+- Do NOT infer, guess, or fabricate any field
+- If a field is not present, use null (strings) or [] (arrays)
+- skills: flat list of technical and soft skills mentioned anywhere
+- For experience entries, extract only what is written — do not summarize differently
+
+${JSON_ONLY}
+
+Return:
 {
-  "name": "",
-  "email": "",
-  "phone": "",
-  "location": "",
-  "summary": "",
-  "skills": ["skill1", "skill2"],
+  "name": "<full name or null>",
+  "email": "<email or null>",
+  "phone": "<phone or null>",
+  "location": "<city/country or null>",
+  "summary": "<professional summary or null>",
+  "skills": ["<skill>"],
   "experience": [
-    { "company": "", "role": "", "duration": "", "description": "" }
+    { "company": "<name>", "role": "<title>", "duration": "<dates>", "description": "<responsibilities>" }
   ],
   "education": [
-    { "institution": "", "degree": "", "year": "" }
+    { "institution": "<name>", "degree": "<degree>", "year": "<year>" }
   ],
   "projects": [
-    { "name": "", "description": "", "technologies": [], "link": "" }
+    { "name": "<name>", "description": "<desc>", "technologies": ["<tech>"], "link": "<url or null>" }
   ],
-  "certifications": []
+  "certifications": ["<cert>"]
 }`;
 
-  const text = await generateWithFallback(prompt);
-  
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Failed to parse resume');
-  return JSON.parse(jsonMatch[0]);
+  const { parsed } = await generateWithRetry(
+    prompt,
+    validators.resume,
+    3
+  );
+
+  return parsed;
 };
 
-/**
- * Generate ATS score and feedback for a resume
- */
+// ─── 5. ATS score ─────────────────────────────────────────────────────────────
 exports.generateATSScore = async ({ resumeText, jobDescription }) => {
-  const prompt = `
-You are an ATS (Applicant Tracking System) expert. Analyze this resume against the job description.
+  const cleanResume = sanitise(resumeText, 3000);
+  const cleanJD     = sanitise(jobDescription, 2000);
+
+  const prompt = `You are an enterprise ATS (Applicant Tracking System) engine.
+
+TASK: Score how well this resume matches the job description.
 
 RESUME:
-${resumeText}
+${cleanResume || 'Not provided'}
 
 JOB DESCRIPTION:
-${jobDescription || 'General software engineering role'}
+${cleanJD || 'General software engineering role'}
 
-Respond ONLY with valid JSON:
+SCORING CRITERIA:
+- Keyword match: required skills/tools from JD present in resume
+- Experience relevance: years and domain match
+- Education fit: degree requirements met
+- Penalize heavily for missing required skills marked as "must have" or "required"
+- Score 70+ only if genuinely strong alignment
+
+INSTRUCTIONS:
+- atsScore must be an integer 0–100
+- feedback must list specific missing keywords and concrete resume edits
+- Do NOT inflate the score
+
+${JSON_ONLY}
+
+Return:
 {
-  "atsScore": <0-100>,
-  "feedback": "<detailed feedback on how to improve ATS compatibility>"
+  "atsScore": <integer 0–100>,
+  "feedback": "<specific feedback with missing keywords and actionable edits>"
 }`;
 
-  const text = await generateWithFallback(prompt);
-  
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Failed to generate ATS score');
-  return JSON.parse(jsonMatch[0]);
+  const { parsed } = await generateWithRetry(
+    prompt,
+    (data) => {
+      const s = Number(data.atsScore);
+      if (isNaN(s) || s < 0 || s > 100) throw new Error(`Invalid atsScore: ${data.atsScore}`);
+      data.atsScore = Math.round(s);
+    },
+    3
+  );
+
+  return parsed;
 };
 
-/**
- * Real-time speech feedback (analyze a short transcript snippet)
- */
+// ─── 6. Real-time speech feedback ────────────────────────────────────────────
 exports.getRealTimeFeedback = async (transcript) => {
-  const prompt = `
-You are a real-time speech coach. Analyze this short speech snippet and give instant feedback.
+  const clean = sanitise(transcript, 500);
+  if (!clean) return { feedback: 'Keep going…', type: 'good', fillerWordsFound: [] };
 
-TRANSCRIPT: "${transcript}"
+  const prompt = `You are a real-time interview speech coach.
 
-Give very brief, actionable feedback (max 15 words). Focus on:
-- Filler words (um, uh, like, you know)
-- Speaking pace
-- Clarity
+TRANSCRIPT SNIPPET: "${clean}"
 
-Respond ONLY with valid JSON:
+TASK: Give ONE short coaching tip (max 8 words) based on what you observe.
+
+TYPE OPTIONS (pick the most relevant):
+- "filler"   → excessive filler words detected (um, uh, like, you know)
+- "pace"     → speaking too fast or too slow
+- "vague"    → answer lacks specifics or examples
+- "concise"  → answer is too long or rambling
+- "clarity"  → unclear structure or logic
+- "good"     → answer is on track, no issues
+
+EXAMPLES:
+- "Avoid saying 'like' and 'basically'." → type: filler
+- "Add a concrete example here." → type: vague
+- "Good structure, keep going." → type: good
+
+${JSON_ONLY}
+
+Return:
 {
-  "feedback": "<short actionable tip>",
-  "type": "<one of: filler_words | pace | clarity | good>",
-  "fillerWordsFound": ["list"]
+  "feedback": "<max 8 words>",
+  "type": "<filler|pace|vague|concise|clarity|good>",
+  "fillerWordsFound": ["<detected fillers>"]
 }`;
 
-  const text = await generateWithFallback(prompt);
-  
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return { feedback: 'Keep going!', type: 'good', fillerWordsFound: [] };
-  return JSON.parse(jsonMatch[0]);
+  try {
+    const { parsed } = await generateWithRetry(prompt, null, 2);
+    return {
+      feedback:        parsed.feedback        || 'Keep going…',
+      type:            parsed.type            || 'good',
+      fillerWordsFound: parsed.fillerWordsFound || [],
+    };
+  } catch {
+    return { feedback: 'Keep going…', type: 'good', fillerWordsFound: [] };
+  }
 };
 
-/**
- * Evaluate coding solution
- */
+// ─── 7. Evaluate coding solution ─────────────────────────────────────────────
 exports.evaluateCodingSolution = async ({ problem, solution, language }) => {
-  const prompt = `
-You are an expert software engineer reviewing a coding interview solution.
+  const cleanSolution = sanitise(solution, 3000);
 
-PROBLEM: ${problem}
+  const prompt = `You are a senior software engineer conducting a coding interview review.
+
+PROBLEM:
+${sanitise(problem, 1000)}
+
 LANGUAGE: ${language}
-SOLUTION:
+
+CANDIDATE'S SOLUTION:
 \`\`\`${language}
-${solution}
+${cleanSolution}
 \`\`\`
 
-Evaluate the solution. Respond ONLY with valid JSON:
+EVALUATION CRITERIA:
+- Correctness: Does it solve the problem for all cases including edge cases?
+- Time Complexity: Analyze using Big-O notation
+- Space Complexity: Analyze using Big-O notation
+- Code Quality: Naming, readability, structure
+- score: 0–10 weighted (correctness 50%, complexity 30%, quality 20%)
+
+INSTRUCTIONS:
+- If solution is empty or clearly wrong, score must be 0–3
+- improvements must be specific code-level suggestions, not generic advice
+- Do NOT assume the solution is correct without verifying the logic
+
+${JSON_ONLY}
+
+Return:
 {
-  "score": <0-10>,
-  "feedback": "<detailed code review>",
+  "score": <0–10>,
+  "isCorrect": <true|false>,
   "timeComplexity": "<e.g. O(n log n)>",
   "spaceComplexity": "<e.g. O(n)>",
-  "isCorrect": <true|false>,
-  "improvements": "<suggestions for improvement>"
+  "feedback": "<specific code review with line-level observations>",
+  "improvements": "<concrete refactoring suggestions>"
 }`;
 
-  const text = await generateWithFallback(prompt);
-  
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Failed to evaluate code');
-  return JSON.parse(jsonMatch[0]);
+  const { parsed } = await generateWithRetry(
+    prompt,
+    (data) => {
+      const s = Number(data.score);
+      if (isNaN(s) || s < 0 || s > 10) throw new Error(`Invalid score: ${data.score}`);
+      data.score = Math.round(s * 10) / 10;
+    },
+    3
+  );
+
+  return parsed;
 };
 
-/**
- * Generate learning roadmap based on weak topics
- */
+// ─── 8. Learning roadmap ──────────────────────────────────────────────────────
 exports.generateLearningRoadmap = async ({ weakTopics, role }) => {
-  const prompt = `
-You are a senior engineering mentor. Create a personalized learning roadmap.
+  if (!weakTopics?.length) throw new Error('weakTopics required');
 
-TARGET ROLE: ${role || 'Software Engineer'}
-WEAK TOPICS: ${weakTopics.join(', ')}
+  const prompt = `You are a senior engineering mentor creating a personalized study plan.
 
-Respond ONLY with valid JSON:
+TARGET ROLE: ${sanitise(role, 100) || 'Software Engineer'}
+WEAK TOPICS: ${weakTopics.slice(0, 10).join(', ')}
+
+TASK: Create a practical 14-day learning roadmap addressing each weak topic.
+
+REQUIREMENTS:
+- Each roadmap item must have specific, actionable tasks (not "study X")
+- Resources must be real platforms: LeetCode, NeetCode, System Design Primer, Educative, YouTube channels
+- priority: "High" for topics most likely to appear in interviews
+- estimatedTime: realistic (e.g. "3 days", "1 week")
+- milestones: measurable checkpoints (e.g. "Solve 10 medium DP problems")
+
+${JSON_ONLY}
+
+Return:
 {
   "roadmap": [
     {
-      "topic": "<topic name>",
-      "priority": "<high|medium|low>",
-      "resources": ["resource 1", "resource 2"],
-      "estimatedTime": "<e.g. 2 weeks>",
-      "milestones": ["milestone 1", "milestone 2"]
+      "topic": "<topic>",
+      "priority": "<High|Medium|Low>",
+      "resources": ["<resource name + platform>"],
+      "estimatedTime": "<duration>",
+      "milestones": ["<measurable checkpoint>"]
     }
   ],
-  "summary": "<overall learning plan summary>"
+  "summary": "<2-sentence overall plan summary>"
 }`;
 
-  const text = await generateWithFallback(prompt);
-  
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('Failed to generate roadmap');
-  return JSON.parse(jsonMatch[0]);
+  const { parsed } = await generateWithRetry(
+    prompt,
+    (data) => {
+      if (!Array.isArray(data.roadmap) || data.roadmap.length < 1) {
+        throw new Error('roadmap must be a non-empty array');
+      }
+    },
+    3
+  );
+
+  return parsed;
 };
-
-

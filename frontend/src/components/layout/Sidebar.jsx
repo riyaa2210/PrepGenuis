@@ -41,70 +41,72 @@ export default function Sidebar({ collapsed }) {
     navigate('/login');
   };
 
-  return (
-    <aside className="sidebar" style={{ width: collapsed ? 52 : 228, transition: 'width 280ms cubic-bezier(0.4,0,0.2,1)' }}>
+  const w = collapsed ? 58 : 240;
 
-      {/* Logo — asymmetric padding */}
+  return (
+    <aside className="sidebar" style={{ width: w, transition: 'width 280ms cubic-bezier(0.4,0,0.2,1)' }}>
+
+      {/* ── Logo ── */}
       <div style={{
-        height: 44,
+        height: 52,
         display: 'flex',
         alignItems: 'center',
-        padding: collapsed ? '0 14px' : '0 14px 0 16px',
+        padding: collapsed ? '0 16px' : '0 16px 0 18px',
         borderBottom: '1px solid var(--border)',
-        gap: 9,
+        gap: 10,
         flexShrink: 0,
+        background: 'linear-gradient(135deg, rgba(95,98,232,0.08) 0%, transparent 60%)',
       }}>
         <div style={{
-          width: 22, height: 22,
-          background: 'var(--accent)',
-          borderRadius: 6,
+          width: 26, height: 26,
+          background: 'linear-gradient(135deg, var(--accent) 0%, #7c5cfc 100%)',
+          borderRadius: 7,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 12, color: '#fff', flexShrink: 0,
-          boxShadow: '0 0 0 1px rgba(95,98,232,0.5), 0 2px 6px rgba(95,98,232,0.3)',
+          fontSize: 13, color: '#fff', flexShrink: 0,
+          boxShadow: '0 0 0 1px rgba(95,98,232,0.5), 0 3px 10px rgba(95,98,232,0.4)',
         }}>◈</div>
         {!collapsed && (
           <span style={{
-            fontWeight: 600,
-            fontSize: '0.929rem',
-            letterSpacing: '-0.025em',
-            color: 'var(--text-primary)',
-            /* Slightly off-baseline — intentional */
-            marginTop: 1,
+            fontWeight: 700,
+            fontSize: '1.032rem',
+            letterSpacing: '-0.03em',
+            background: 'linear-gradient(135deg, #e0e0ff 0%, #a5b4fc 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
           }}>
             PrepGenius
           </span>
         )}
       </div>
 
-      {/* Nav */}
+      {/* ── Nav ── */}
       <nav style={{
         flex: 1,
         overflowY: 'auto',
         overflowX: 'hidden',
-        /* Asymmetric padding */
-        padding: '10px 7px 8px',
+        padding: '12px 8px 8px',
         display: 'flex',
         flexDirection: 'column',
-        gap: 1,
+        gap: 2,
       }}>
         {NAV_GROUPS.map((group, gi) => {
           if (group.role && group.role !== user?.role) return null;
           return (
-            <div key={gi} style={{ marginBottom: gi < NAV_GROUPS.length - 1 ? 8 : 0 }}>
+            <div key={gi} style={{ marginBottom: gi < NAV_GROUPS.length - 1 ? 10 : 0 }}>
               {group.label && !collapsed && (
                 <div style={{
-                  fontSize: '0.714rem',
-                  fontWeight: 500,
+                  fontSize: '0.774rem',
+                  fontWeight: 600,
                   color: 'var(--text-muted)',
-                  letterSpacing: '0.06em',
+                  letterSpacing: '0.07em',
                   textTransform: 'uppercase',
-                  /* Slightly more left padding than nav items */
-                  padding: '8px 10px 3px',
+                  padding: '8px 10px 4px',
                 }}>
                   {group.label}
                 </div>
               )}
-              {group.label && collapsed && <div style={{ height: 6 }} />}
+              {group.label && collapsed && <div style={{ height: 8 }} />}
               {group.items.map((item) => (
                 <NavLink
                   key={item.to}
@@ -126,45 +128,99 @@ export default function Sidebar({ collapsed }) {
         })}
       </nav>
 
-      {/* User footer */}
+      {/* ── User footer with visible sign-out ── */}
       <div style={{
-        padding: collapsed ? '8px 7px' : '8px 7px',
+        padding: '10px 8px',
         borderTop: '1px solid var(--border)',
         flexShrink: 0,
+        background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.2) 100%)',
       }}>
         {!collapsed ? (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 8px',
-            borderRadius: 'var(--r-sm)',
-            transition: 'background var(--t-fast)',
-          }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-elevated)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-          >
-            <Avatar name={user?.name} size={24} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="truncate" style={{ fontSize: '0.786rem', fontWeight: 500, color: 'var(--text-primary)' }}>
-                {user?.name}
-              </div>
-              <div style={{ fontSize: '0.714rem', color: 'var(--text-muted)', textTransform: 'capitalize', marginTop: 1 }}>
-                {user?.role}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* User info row */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 9,
+              padding: '8px 10px',
+              borderRadius: 'var(--r-md)',
+              background: 'linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-overlay) 100%)',
+              border: '1px solid var(--border)',
+            }}>
+              <Avatar name={user?.name} size={28} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="truncate" style={{ fontSize: '0.903rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {user?.name}
+                </div>
+                <div style={{ fontSize: '0.806rem', color: 'var(--text-muted)', textTransform: 'capitalize', marginTop: 1 }}>
+                  {user?.role}
+                </div>
               </div>
             </div>
+
+            {/* Sign out — full-width, clearly visible */}
             <button
-              className="btn btn-ghost btn-icon btn-xs"
               onClick={handleLogout}
-              title="Sign out"
-              style={{ flexShrink: 0, opacity: 0.6 }}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                padding: '9px 14px',
+                borderRadius: 'var(--r-sm)',
+                background: 'linear-gradient(135deg, rgba(248,113,113,0.12) 0%, rgba(248,113,113,0.06) 100%)',
+                border: '1px solid rgba(248,113,113,0.3)',
+                color: 'var(--red)',
+                fontSize: '0.903rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all var(--t-fast)',
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(248,113,113,0.22) 0%, rgba(248,113,113,0.12) 100%)';
+                e.currentTarget.style.borderColor = 'rgba(248,113,113,0.5)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(248,113,113,0.12) 0%, rgba(248,113,113,0.06) 100%)';
+                e.currentTarget.style.borderColor = 'rgba(248,113,113,0.3)';
+              }}
             >
-              ⎋
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M5 2H2.5A1.5 1.5 0 0 0 1 3.5v7A1.5 1.5 0 0 0 2.5 12H5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                <path d="M9.5 9.5L13 7l-3.5-2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M13 7H5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+              Sign out
             </button>
           </div>
         ) : (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0' }}>
-            <Avatar name={user?.name} size={24} />
+          /* Collapsed: just avatar + sign-out icon */
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <Avatar name={user?.name} size={28} />
+            <button
+              onClick={handleLogout}
+              title="Sign out"
+              style={{
+                width: 34, height: 34,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 'var(--r-sm)',
+                background: 'rgba(248,113,113,0.1)',
+                border: '1px solid rgba(248,113,113,0.25)',
+                color: 'var(--red)',
+                cursor: 'pointer',
+                transition: 'all var(--t-fast)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(248,113,113,0.2)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(248,113,113,0.1)'; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M5 2H2.5A1.5 1.5 0 0 0 1 3.5v7A1.5 1.5 0 0 0 2.5 12H5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                <path d="M9.5 9.5L13 7l-3.5-2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M13 7H5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+            </button>
           </div>
         )}
       </div>
