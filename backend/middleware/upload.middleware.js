@@ -1,14 +1,9 @@
-const multer = require('multer');
-const path = require('path');
+const multer  = require('multer');
 const AppError = require('../utils/AppError');
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/resumes/'),
-  filename: (req, file, cb) => {
-    const unique = `${req.user.id}-${Date.now()}${path.extname(file.originalname)}`;
-    cb(null, unique);
-  },
-});
+// ── Use memoryStorage — works on Render (no persistent filesystem) ────────────
+// File is available as req.file.buffer instead of req.file.path
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   if (file.mimetype === 'application/pdf') {
