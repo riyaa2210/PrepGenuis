@@ -37,10 +37,7 @@ PrepGenius is an **AI-powered interview preparation platform** that simulates re
 ---
 
 ## 🎥 Demo
-
-<p align="center">
-  <img src="./screenshots/demo.gif" width="800"/>
-</p>
+https://prepgenuis-frontend.onrender.com/login
 
 ---
 
