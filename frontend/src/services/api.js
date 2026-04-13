@@ -1,24 +1,29 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
+// ── Base URL ──────────────────────────────────────────────────────────────────
+// Dev:  reads from frontend/.env        → http://localhost:5000
+// Prod: reads from frontend/.env.production → https://prepgenuis.onrender.com
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://prepgenuis.onrender.com';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: `${BASE_URL}/api`,
   withCredentials: true,
 });
 
-// Attach access token
+// ── Attach access token to every request ─────────────────────────────────────
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// Auto-refresh on 401
+// ── Auto-refresh on 401 ───────────────────────────────────────────────────────
 let isRefreshing = false;
-let failedQueue = [];
+let failedQueue  = [];
 
 const processQueue = (error, token = null) => {
-  failedQueue.forEach((prom) => (error ? prom.reject(error) : prom.resolve(token)));
+  failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token)));
   failedQueue = [];
 };
 
@@ -26,6 +31,7 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
+
     if (error.response?.status === 401 && !original._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
@@ -39,10 +45,15 @@ api.interceptors.response.use(
       }
 
       original._retry = true;
-      isRefreshing = true;
+      isRefreshing    = true;
 
       try {
-        const { data } = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
+        // Use the same BASE_URL for the refresh call
+        const { data } = await axios.post(
+          `${BASE_URL}/api/auth/refresh`,
+          {},
+          { withCredentials: true }
+        );
         localStorage.setItem('accessToken', data.accessToken);
         processQueue(null, data.accessToken);
         original.headers.Authorization = `Bearer ${data.accessToken}`;

@@ -36,6 +36,7 @@ const io = new Server(server, {
       process.env.CLIENT_URL,
       'http://localhost:5173',
       'http://localhost:5174',
+      'https://prepgenuis.onrender.com',
     ].filter(Boolean),
     methods: ['GET', 'POST'],
     credentials: true,
@@ -56,6 +57,7 @@ app.use(cors({
       process.env.CLIENT_URL,
       'http://localhost:5173',
       'http://localhost:5174',
+      'https://prepgenuis.onrender.com',  // deployed frontend
     ].filter(Boolean);
     if (!origin || allowed.includes(origin)) return cb(null, true);
     cb(new Error('Not allowed by CORS'));
