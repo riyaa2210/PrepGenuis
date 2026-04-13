@@ -1,9 +1,8 @@
 import api from './api';
 
 export const uploadResume = (formData) =>
-  api.post('/resume/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  // Do NOT set Content-Type manually — axios sets it with the correct boundary
+  api.post('/resume/upload', formData);
 
 export const getResume = () => api.get('/resume');
 export const deleteResume = () => api.delete('/resume');

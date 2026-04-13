@@ -17,7 +17,12 @@ export default function ResumeUploadPage() {
   useEffect(() => {
     getResume()
       .then(({ data }) => setResume(data.resume))
-      .catch(() => {})
+      .catch((err) => {
+        // 404 = no resume yet — that's fine, show upload UI
+        if (err.response?.status !== 404) {
+          toast.error('Failed to load resume');
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -31,9 +36,10 @@ export default function ResumeUploadPage() {
     try {
       const { data } = await uploadResume(fd);
       setResume(data.resume);
-      toast.success('Resume parsed');
-    } catch { toast.error('Upload failed'); }
-    finally { setUploading(false); }
+      toast.success('Resume parsed successfully!');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Upload failed. Please try again.');
+    } finally { setUploading(false); }
   };
 
   const handleDelete = async () => {
