@@ -35,7 +35,8 @@ export default function RegisterPage() {
       display: 'grid',
       gridTemplateColumns: '7fr 5fr',
       overflow: 'hidden',
-    }}>
+    }}
+    className="auth-grid">
 
       {/* ── Left panel — 3D animated brand side ── */}
       <div style={{
@@ -44,7 +45,8 @@ export default function RegisterPage() {
         display: 'flex', flexDirection: 'column',
         padding: '40px 44px',
         position: 'relative', overflow: 'hidden',
-      }}>
+      }}
+      className="auth-brand">
         {/* 3D scene */}
         <AuthScene3D />
 

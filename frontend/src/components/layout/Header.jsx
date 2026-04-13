@@ -64,7 +64,7 @@ export default function Header({ collapsed, onToggle }) {
       <div style={{ flex: 1 }} />
 
       {/* Search */}
-      <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative' }} className="header-search">
         <svg style={{
           position: 'absolute', left: 10, top: '50%',
           transform: 'translateY(-50%)',
@@ -88,7 +88,7 @@ export default function Header({ collapsed, onToggle }) {
 
       {/* Score pill — gradient */}
       {user?.totalInterviews > 0 && (
-        <div style={{
+        <div className="header-score" style={{
           display: 'flex', alignItems: 'center', gap: 6,
           background: 'linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-overlay) 100%)',
           border: '1px solid var(--border-strong)',

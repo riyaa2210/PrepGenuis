@@ -6,7 +6,7 @@ const sendTokens = (res, user, accessToken, refreshToken, statusCode = 200) => {
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict', // 'none' required for cross-origin on Render
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
   res.status(statusCode).json({ success: true, accessToken, user });

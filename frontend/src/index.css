@@ -699,3 +699,58 @@ kbd {
   opacity: 0.4;
 }
 
+
+/* ─── Responsive ────────────────────────────────────────────────────────────── */
+
+/* Tablet — 768px */
+@media (max-width: 768px) {
+  html { font-size: 14px; }
+
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: 52px 1fr;
+  }
+
+  /* Stack stats 2-col on tablet */
+  .stat-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Full-width cards */
+  .card { border-radius: var(--r-md); }
+
+  /* Table — horizontal scroll */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table { min-width: 560px; }
+
+  /* Tabs — scrollable */
+  .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+  .tab  { flex-shrink: 0; }
+}
+
+/* Mobile — 480px */
+@media (max-width: 480px) {
+  html { font-size: 13px; }
+
+  .main-content { padding: 14px 14px 20px; }
+
+  /* Stats single column */
+  .stat-grid-4 { grid-template-columns: 1fr 1fr !important; }
+
+  /* Buttons full width in forms */
+  .btn-block-mobile { width: 100% !important; }
+
+  /* Hide non-essential header items */
+  .header-search { display: none !important; }
+  .header-score  { display: none !important; }
+
+  /* Modal full screen */
+  .modal { max-width: 100% !important; margin: 0 !important; border-radius: 0 !important; }
+
+  /* Login/Register — single column */
+  .auth-grid { grid-template-columns: 1fr !important; }
+  .auth-brand { display: none !important; }
+}
+
+/* Large screens — 1400px+ */
+@media (min-width: 1400px) {
+  html { font-size: 16px; }
+}

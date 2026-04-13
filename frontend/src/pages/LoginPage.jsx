@@ -35,7 +35,8 @@ export default function LoginPage() {
       display: 'grid',
       gridTemplateColumns: '5fr 7fr',
       overflow: 'hidden',
-    }}>
+    }}
+    className="auth-grid">
 
       {/* ── Left panel — 3D animated brand side ── */}
       <div style={{
@@ -46,7 +47,8 @@ export default function LoginPage() {
         padding: '40px 44px',
         position: 'relative',
         overflow: 'hidden',
-      }}>
+      }}
+      className="auth-brand">
         {/* 3D scene fills the background */}
         <AuthScene3D />
 

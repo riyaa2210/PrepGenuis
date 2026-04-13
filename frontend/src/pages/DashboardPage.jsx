@@ -149,7 +149,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Stats row ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:20 }} className="stagger">
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:20 }} className="stagger stat-grid-4">
         <StatCard label="Total Interviews" value={user?.totalInterviews || 0} sub="all time" loading={loading} />
         <StatCard
           label="Avg Score"
